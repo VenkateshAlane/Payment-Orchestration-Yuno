@@ -1,0 +1,12 @@
+payment:
+  retry:
+    max-attempts-per-provider: 2
+    initial-backoff-ms: 0
+    backoff-multiplier: 1.0
+    max-backoff-ms: 0
+
+provider:
+  a:
+    failure-rate: 0.0
+  b:
+    failure-rate: 0.0
