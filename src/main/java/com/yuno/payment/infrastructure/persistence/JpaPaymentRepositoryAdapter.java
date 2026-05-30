@@ -33,8 +33,19 @@ public class JpaPaymentRepositoryAdapter implements PaymentRepositoryPort {
     @Override
     @Transactional
     public void save(Payment payment) {
-        PaymentEntity entity = mapper.toEntity(payment);
-        jpaRepository.save(entity);
+        java.util.UUID id = payment.getId().value();
+        jpaRepository.findById(id).ifPresentOrElse(
+            existing -> {
+                // Update mutable fields in-place so JPA dirty-tracking issues the UPDATE
+                // with the correct @Version from the database — avoids stale-version conflicts.
+                existing.setStatus(payment.getStatus().name());
+                existing.setAssignedProvider(payment.getAssignedProvider());
+                existing.setProviderTransactionId(payment.getProviderTransactionId());
+                existing.setAttemptCount(payment.getAttemptCount());
+                existing.setUpdatedAt(payment.getUpdatedAt());
+            },
+            () -> jpaRepository.save(mapper.toEntity(payment))
+        );
     }
 
     @Override

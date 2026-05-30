@@ -48,7 +48,7 @@ public class PaymentEntity {
 
     @Version
     @Column(name = "version", nullable = false)
-    private Long version;
+    private long version;
 
     // JPA requires a no-arg constructor
     protected PaymentEntity() {}
