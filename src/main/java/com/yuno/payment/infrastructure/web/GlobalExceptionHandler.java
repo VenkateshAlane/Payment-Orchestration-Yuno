@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -43,11 +44,21 @@ public class GlobalExceptionHandler {
                         "Payment could not be processed — all providers failed", 422));
     }
 
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleOptimisticLock(ObjectOptimisticLockingFailureException e) {
+        log.warn("Optimistic locking conflict: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ErrorResponse.of("CONCURRENT_MODIFICATION",
+                        "Payment was modified concurrently — please retry", 409));
+    }
+
     @ExceptionHandler(IllegalStateTransitionException.class)
     public ResponseEntity<ErrorResponse> handleIllegalTransition(IllegalStateTransitionException e) {
+        // Log full details server-side; do not surface payment ID or state names to caller
         log.error("Illegal state transition: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ErrorResponse.of("ILLEGAL_STATE_TRANSITION", e.getMessage(), 409));
+                .body(ErrorResponse.of("ILLEGAL_STATE_TRANSITION",
+                        "Payment is in an invalid state for this operation", 409));
     }
 
     @ExceptionHandler(UnsupportedPaymentMethodException.class)
@@ -74,8 +85,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException e) {
+        // Log the actual message for debugging; return a safe generic string to caller
+        log.debug("Bad request: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ErrorResponse.of("BAD_REQUEST", e.getMessage(), 400));
+                .body(ErrorResponse.of("BAD_REQUEST", "Invalid request parameter", 400));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

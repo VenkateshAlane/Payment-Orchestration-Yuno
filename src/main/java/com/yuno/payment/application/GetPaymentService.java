@@ -8,11 +8,15 @@ import com.yuno.payment.domain.port.inbound.GetPaymentUseCase;
 import com.yuno.payment.domain.port.outbound.PaymentRepositoryPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Retrieves a payment by ID and maps it to PaymentResult.
- * Read-only — no transactions needed.
+ * Read-only transaction: hints the JDBC driver and connection pool that
+ * no writes occur, enabling optimisations (e.g. replica routing).
  */
+@Service
 public class GetPaymentService implements GetPaymentUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(GetPaymentService.class);
@@ -24,22 +28,13 @@ public class GetPaymentService implements GetPaymentUseCase {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public PaymentResult execute(GetPaymentQuery query) {
         log.info("Fetching payment id={}", query.paymentId());
 
         Payment payment = repository.findById(query.paymentId())
                 .orElseThrow(() -> new PaymentNotFoundException(query.paymentId()));
 
-        return new PaymentResult(
-                payment.getId().toString(),
-                payment.getStatus().name(),
-                payment.getMethod().name(),
-                payment.getAssignedProvider(),
-                payment.getAmount().amount(),
-                payment.getAmount().currency(),
-                payment.getAttemptCount(),
-                payment.getCreatedAt(),
-                payment.getUpdatedAt()
-        );
+        return PaymentResultMapper.toResult(payment);
     }
 }

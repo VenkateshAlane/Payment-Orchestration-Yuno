@@ -11,7 +11,10 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Null Object pattern: in-memory IdempotencyPort for unit tests.
  * No Redis required — tests run fast and in isolation.
- * Thread-safe via ConcurrentHashMap.
+ *
+ * Thread-safe atomic operations:
+ *   find()  → ConcurrentHashMap.get()       (read, no lock)
+ *   store() → ConcurrentHashMap.putIfAbsent() (atomic write — first writer wins)
  */
 public class InMemoryIdempotencyAdapter implements IdempotencyPort {
 
@@ -24,7 +27,7 @@ public class InMemoryIdempotencyAdapter implements IdempotencyPort {
 
     @Override
     public void store(IdempotencyKey key, PaymentResult result) {
-        store.put(key.value(), result);
+        store.putIfAbsent(key.value(), result);
     }
 
     /** Test helper — check how many results are stored. */

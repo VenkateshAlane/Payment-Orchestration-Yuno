@@ -21,6 +21,10 @@ import java.util.Optional;
  *
  * GRASP Indirection: the application layer calls IdempotencyPort and has
  * zero knowledge of Redis, JSON serialisation, or TTL configuration.
+ *
+ * Atomicity: store() uses setIfAbsent (Redis SET NX EX) so the first writer
+ * wins. Concurrent duplicate requests that both pass find() will both process
+ * the payment, but only the first completion writes the cached result.
  */
 public class RedisIdempotencyAdapter implements IdempotencyPort {
 
@@ -62,8 +66,12 @@ public class RedisIdempotencyAdapter implements IdempotencyPort {
         String redisKey = toRedisKey(key);
         try {
             String json = objectMapper.writeValueAsString(result);
-            redisTemplate.opsForValue().set(redisKey, json, ttl);
-            log.debug("Stored idempotency key={} ttl={}", key, ttl);
+            Boolean stored = redisTemplate.opsForValue().setIfAbsent(redisKey, json, ttl);
+            if (Boolean.TRUE.equals(stored)) {
+                log.debug("Stored idempotency key={} ttl={}", key, ttl);
+            } else {
+                log.debug("Idempotency key already present, skipping store key={}", key);
+            }
         } catch (JsonProcessingException e) {
             log.error("Failed to serialise PaymentResult for idempotency key={} error={}", key, e.getMessage());
         }

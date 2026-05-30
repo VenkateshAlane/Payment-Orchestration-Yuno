@@ -1,26 +1,22 @@
 package com.yuno.payment.infrastructure.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.yuno.payment.application.CreatePaymentService;
-import com.yuno.payment.application.GetPaymentService;
 import com.yuno.payment.application.RetryableProviderExecutor;
-import com.yuno.payment.domain.port.inbound.CreatePaymentUseCase;
-import com.yuno.payment.domain.port.inbound.GetPaymentUseCase;
 import com.yuno.payment.domain.port.outbound.IdempotencyPort;
 import com.yuno.payment.domain.port.outbound.PaymentProviderPort;
-import com.yuno.payment.domain.port.outbound.PaymentRepositoryPort;
 import com.yuno.payment.domain.service.*;
 import com.yuno.payment.infrastructure.idempotency.RedisIdempotencyAdapter;
+import com.yuno.payment.infrastructure.observability.CircuitBreakerProviderDecorator;
 import com.yuno.payment.infrastructure.observability.LoggingProviderDecorator;
 import com.yuno.payment.infrastructure.observability.ObservingProviderDecorator;
 import com.yuno.payment.infrastructure.observability.PaymentTraceFilter;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import com.yuno.payment.infrastructure.provider.ProviderAAdapter;
 import com.yuno.payment.infrastructure.provider.ProviderBAdapter;
 import com.yuno.payment.infrastructure.provider.ProviderSimulator;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -50,22 +46,29 @@ public class PaymentConfig {
     }
 
     // ── Provider Adapters wrapped in decorator stack ───────────────────────────
-    //    ObservingProviderDecorator → LoggingProviderDecorator → ActualAdapter
+    //    ObservingProviderDecorator → LoggingProviderDecorator
+    //    → CircuitBreakerProviderDecorator → ActualAdapter
 
     @Bean("providerA")
     public PaymentProviderPort providerAAdapter(ProviderSimulator simulator,
-                                                ObservationRegistry observationRegistry) {
+                                                ObservationRegistry observationRegistry,
+                                                CircuitBreakerRegistry circuitBreakerRegistry) {
         return new ObservingProviderDecorator(
-                new LoggingProviderDecorator(new ProviderAAdapter(simulator)),
+                new LoggingProviderDecorator(
+                        new CircuitBreakerProviderDecorator(
+                                new ProviderAAdapter(simulator), circuitBreakerRegistry)),
                 observationRegistry
         );
     }
 
     @Bean("providerB")
     public PaymentProviderPort providerBAdapter(ProviderSimulator simulator,
-                                                ObservationRegistry observationRegistry) {
+                                                ObservationRegistry observationRegistry,
+                                                CircuitBreakerRegistry circuitBreakerRegistry) {
         return new ObservingProviderDecorator(
-                new LoggingProviderDecorator(new ProviderBAdapter(simulator)),
+                new LoggingProviderDecorator(
+                        new CircuitBreakerProviderDecorator(
+                                new ProviderBAdapter(simulator), circuitBreakerRegistry)),
                 observationRegistry
         );
     }
@@ -117,29 +120,14 @@ public class PaymentConfig {
         return new RedisIdempotencyAdapter(redisTemplate, objectMapper, Duration.ofHours(ttlHours));
     }
 
-    // ── Use cases ─────────────────────────────────────────────────────────────
-
-    @Bean
-    public CreatePaymentUseCase createPaymentUseCase(PaymentRepositoryPort repository,
-                                                     IdempotencyPort idempotency,
-                                                     RoutingEngine routingEngine,
-                                                     RetryableProviderExecutor executor,
-                                                     ApplicationEventPublisher eventPublisher) {
-        return new CreatePaymentService(repository, idempotency, routingEngine, executor, eventPublisher);
-    }
-
-    @Bean
-    public GetPaymentUseCase getPaymentUseCase(PaymentRepositoryPort repository) {
-        return new GetPaymentService(repository);
-    }
-
     // ── Observability ─────────────────────────────────────────────────────────
 
     @Bean
     public FilterRegistrationBean<PaymentTraceFilter> paymentTraceFilter() {
         FilterRegistrationBean<PaymentTraceFilter> registration = new FilterRegistrationBean<>();
         registration.setFilter(new PaymentTraceFilter());
-        registration.addUrlPatterns("/payments/*");
+        // "/payments" covers POST /payments; "/payments/*" covers GET /payments/{id}
+        registration.addUrlPatterns("/payments", "/payments/*");
         registration.setOrder(1);
         return registration;
     }

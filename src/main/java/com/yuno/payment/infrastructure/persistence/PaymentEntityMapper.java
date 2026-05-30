@@ -22,6 +22,7 @@ public class PaymentEntityMapper {
                 payment.getMethod().name(),
                 payment.getStatus().name(),
                 payment.getAssignedProvider(),
+                payment.getProviderTransactionId(),
                 payment.getAttemptCount(),
                 payment.getCreatedAt(),
                 payment.getUpdatedAt()
@@ -38,6 +39,7 @@ public class PaymentEntityMapper {
                 PaymentMethod.valueOf(entity.getMethod()),
                 PaymentStatus.valueOf(entity.getStatus()),
                 entity.getAssignedProvider(),
+                entity.getProviderTransactionId(),
                 entity.getAttemptCount(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()

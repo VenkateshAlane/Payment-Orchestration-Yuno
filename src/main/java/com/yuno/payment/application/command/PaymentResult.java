@@ -13,6 +13,7 @@ public record PaymentResult(
         String status,
         String method,
         String assignedProvider,
+        String providerTransactionId,
         BigDecimal amount,
         String currency,
         int attemptCount,

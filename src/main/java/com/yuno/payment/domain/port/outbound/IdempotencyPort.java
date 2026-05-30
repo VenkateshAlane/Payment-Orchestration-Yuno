@@ -18,7 +18,10 @@ public interface IdempotencyPort {
     Optional<PaymentResult> find(IdempotencyKey key);
 
     /**
-     * Stores the result under the given key with a configured TTL.
+     * Atomically stores the result under the given key only if the key is absent.
+     * If the key already exists (concurrent duplicate request), the existing entry
+     * is preserved and this call is a no-op.
+     * Implemented via Redis SET NX EX and ConcurrentHashMap.putIfAbsent.
      */
     void store(IdempotencyKey key, PaymentResult result);
 }

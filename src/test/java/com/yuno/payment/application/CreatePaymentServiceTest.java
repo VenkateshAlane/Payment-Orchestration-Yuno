@@ -79,7 +79,7 @@ class CreatePaymentServiceTest {
     @DisplayName("returns cached result on duplicate idempotency key")
     void idempotencyHitReturnsCached() {
         PaymentResult cached = new PaymentResult(
-                "existing-id", "SUCCESS", "CARD", "PROVIDER_A",
+                "existing-id", "SUCCESS", "CARD", "PROVIDER_A", "txn-cached",
                 new BigDecimal("100"), "USD", 1, null, null
         );
         when(idempotency.find(new IdempotencyKey("key-dup"))).thenReturn(Optional.of(cached));
@@ -112,8 +112,9 @@ class CreatePaymentServiceTest {
 
         // PENDING + PROCESSING + FAILED = 3 saves
         verify(repository, times(3)).save(any());
-        // No idempotency stored for failed payments
-        verify(idempotency, never()).store(any(), any());
+        // FAILED result is cached so a retry with the same key returns FAILED
+        // immediately instead of re-attempting the charge
+        verify(idempotency, times(1)).store(any(), any());
     }
 
     @Test

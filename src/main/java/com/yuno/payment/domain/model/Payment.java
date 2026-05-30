@@ -4,6 +4,7 @@ import com.yuno.payment.domain.event.PaymentStatusChangedEvent;
 import com.yuno.payment.domain.exception.IllegalStateTransitionException;
 
 import java.time.Instant;
+import java.util.Objects;
 
 /**
  * Payment aggregate root.
@@ -22,6 +23,7 @@ public class Payment {
     private final PaymentMethod method;
     private PaymentStatus status;
     private String assignedProvider;
+    private String providerTransactionId;
     private int attemptCount;
     private final Instant createdAt;
     private Instant updatedAt;
@@ -33,17 +35,19 @@ public class Payment {
                     PaymentMethod method,
                     PaymentStatus status,
                     String assignedProvider,
+                    String providerTransactionId,
                     int attemptCount,
                     Instant createdAt,
                     Instant updatedAt) {
-        this.id               = id;
-        this.amount           = amount;
-        this.method           = method;
-        this.status           = status;
-        this.assignedProvider = assignedProvider;
-        this.attemptCount     = attemptCount;
-        this.createdAt        = createdAt;
-        this.updatedAt        = updatedAt;
+        this.id                    = id;
+        this.amount                = amount;
+        this.method                = method;
+        this.status                = status;
+        this.assignedProvider      = assignedProvider;
+        this.providerTransactionId = providerTransactionId;
+        this.attemptCount          = attemptCount;
+        this.createdAt             = createdAt;
+        this.updatedAt             = updatedAt;
     }
 
     // ── Factory: new payment ──
@@ -63,6 +67,7 @@ public class Payment {
                 method,
                 PaymentStatus.PENDING,
                 null,
+                null,
                 0,
                 now,
                 now
@@ -72,17 +77,26 @@ public class Payment {
     // ── Factory: reconstitute from persistence ──
 
     /**
-     * Rebuilds a Payment from stored values. No validation — the DB is the source of truth.
+     * Rebuilds a Payment from stored values.
+     * Validates critical fields so corrupted DB rows surface here, not deep in
+     * business logic where the error would be harder to diagnose.
      */
     public static Payment reconstitute(PaymentId id,
                                        Money amount,
                                        PaymentMethod method,
                                        PaymentStatus status,
                                        String assignedProvider,
+                                       String providerTransactionId,
                                        int attemptCount,
                                        Instant createdAt,
                                        Instant updatedAt) {
-        return new Payment(id, amount, method, status, assignedProvider, attemptCount, createdAt, updatedAt);
+        Objects.requireNonNull(id,        "Reconstituted payment must have an id");
+        Objects.requireNonNull(amount,    "Reconstituted payment must have an amount");
+        Objects.requireNonNull(method,    "Reconstituted payment must have a method");
+        Objects.requireNonNull(status,    "Reconstituted payment must have a status");
+        Objects.requireNonNull(createdAt, "Reconstituted payment must have a createdAt");
+        Objects.requireNonNull(updatedAt, "Reconstituted payment must have an updatedAt");
+        return new Payment(id, amount, method, status, assignedProvider, providerTransactionId, attemptCount, createdAt, updatedAt);
     }
 
     // ── State transitions (each returns a domain event) ──
@@ -100,14 +114,18 @@ public class Payment {
     }
 
     /**
-     * Marks the payment as SUCCESS and records which provider processed it.
+     * Marks the payment as SUCCESS and records which provider processed it
+     * along with the provider's own transaction reference (for reconciliation).
      */
-    public PaymentStatusChangedEvent markSuccess(String provider) {
+    public PaymentStatusChangedEvent markSuccess(String provider, String providerTransactionId) {
+        Objects.requireNonNull(provider, "Provider ID must not be null on success");
+        Objects.requireNonNull(providerTransactionId, "Provider transaction ID must not be null on success");
         PaymentStatus previous = this.status;
         validateTransition(PaymentStatus.SUCCESS);
-        this.status           = PaymentStatus.SUCCESS;
-        this.assignedProvider = provider;
-        this.updatedAt        = Instant.now();
+        this.status                = PaymentStatus.SUCCESS;
+        this.assignedProvider      = provider;
+        this.providerTransactionId = providerTransactionId;
+        this.updatedAt             = Instant.now();
         return new PaymentStatusChangedEvent(this.id, previous, this.status, provider, this.updatedAt);
     }
 
@@ -139,12 +157,13 @@ public class Payment {
 
     // ── Getters (no setters — mutations go through state-transition methods) ──
 
-    public PaymentId      getId()               { return id; }
-    public Money          getAmount()            { return amount; }
-    public PaymentMethod  getMethod()            { return method; }
-    public PaymentStatus  getStatus()            { return status; }
-    public String         getAssignedProvider()  { return assignedProvider; }
-    public int            getAttemptCount()      { return attemptCount; }
-    public Instant        getCreatedAt()         { return createdAt; }
-    public Instant        getUpdatedAt()         { return updatedAt; }
+    public PaymentId      getId()                    { return id; }
+    public Money          getAmount()                { return amount; }
+    public PaymentMethod  getMethod()                { return method; }
+    public PaymentStatus  getStatus()                { return status; }
+    public String         getAssignedProvider()      { return assignedProvider; }
+    public String         getProviderTransactionId() { return providerTransactionId; }
+    public int            getAttemptCount()          { return attemptCount; }
+    public Instant        getCreatedAt()             { return createdAt; }
+    public Instant        getUpdatedAt()             { return updatedAt; }
 }

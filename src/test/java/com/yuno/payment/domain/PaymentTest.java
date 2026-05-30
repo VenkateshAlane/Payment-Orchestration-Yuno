@@ -115,7 +115,7 @@ class PaymentTest {
         void processingToSuccess() {
             Payment payment = Payment.create(VALID_MONEY, PaymentMethod.CARD);
             payment.markProcessing();
-            payment.markSuccess("PROVIDER_A");
+            payment.markSuccess("PROVIDER_A", "txn-001");
             assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
         }
 
@@ -124,7 +124,7 @@ class PaymentTest {
         void recordsProvider() {
             Payment payment = Payment.create(VALID_MONEY, PaymentMethod.CARD);
             payment.markProcessing();
-            payment.markSuccess("PROVIDER_A");
+            payment.markSuccess("PROVIDER_A", "txn-001");
             assertThat(payment.getAssignedProvider()).isEqualTo("PROVIDER_A");
         }
 
@@ -133,7 +133,7 @@ class PaymentTest {
         void returnsEvent() {
             Payment payment = Payment.create(VALID_MONEY, PaymentMethod.CARD);
             payment.markProcessing();
-            PaymentStatusChangedEvent event = payment.markSuccess("PROVIDER_A");
+            PaymentStatusChangedEvent event = payment.markSuccess("PROVIDER_A", "txn-001");
             assertThat(event.from()).isEqualTo(PaymentStatus.PROCESSING);
             assertThat(event.to()).isEqualTo(PaymentStatus.SUCCESS);
         }
@@ -142,7 +142,7 @@ class PaymentTest {
         @DisplayName("throws on illegal transition: PENDING → SUCCESS")
         void throwsFromPending() {
             Payment payment = Payment.create(VALID_MONEY, PaymentMethod.CARD);
-            assertThatThrownBy(() -> payment.markSuccess("PROVIDER_A"))
+            assertThatThrownBy(() -> payment.markSuccess("PROVIDER_A", "txn-001"))
                     .isInstanceOf(IllegalStateTransitionException.class);
         }
 
@@ -151,8 +151,8 @@ class PaymentTest {
         void throwsFromSuccess() {
             Payment payment = Payment.create(VALID_MONEY, PaymentMethod.CARD);
             payment.markProcessing();
-            payment.markSuccess("PROVIDER_A");
-            assertThatThrownBy(() -> payment.markSuccess("PROVIDER_A"))
+            payment.markSuccess("PROVIDER_A", "txn-001");
+            assertThatThrownBy(() -> payment.markSuccess("PROVIDER_A", "txn-002"))
                     .isInstanceOf(IllegalStateTransitionException.class);
         }
     }

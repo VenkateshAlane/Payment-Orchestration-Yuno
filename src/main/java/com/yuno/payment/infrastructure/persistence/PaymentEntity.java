@@ -34,6 +34,9 @@ public class PaymentEntity {
     @Column(name = "assigned_provider", length = 50)
     private String assignedProvider;
 
+    @Column(name = "provider_transaction_id", length = 100)
+    private String providerTransactionId;
+
     @Column(name = "attempt_count", nullable = false)
     private int attemptCount;
 
@@ -42,6 +45,10 @@ public class PaymentEntity {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 
     // JPA requires a no-arg constructor
     protected PaymentEntity() {}
@@ -52,33 +59,37 @@ public class PaymentEntity {
                          String method,
                          String status,
                          String assignedProvider,
+                         String providerTransactionId,
                          int attemptCount,
                          Instant createdAt,
                          Instant updatedAt) {
-        this.id               = id;
-        this.amount           = amount;
-        this.currency         = currency;
-        this.method           = method;
-        this.status           = status;
-        this.assignedProvider = assignedProvider;
-        this.attemptCount     = attemptCount;
-        this.createdAt        = createdAt;
-        this.updatedAt        = updatedAt;
+        this.id                    = id;
+        this.amount                = amount;
+        this.currency              = currency;
+        this.method                = method;
+        this.status                = status;
+        this.assignedProvider      = assignedProvider;
+        this.providerTransactionId = providerTransactionId;
+        this.attemptCount          = attemptCount;
+        this.createdAt             = createdAt;
+        this.updatedAt             = updatedAt;
     }
 
-    public UUID      getId()               { return id; }
-    public BigDecimal getAmount()          { return amount; }
-    public String    getCurrency()         { return currency; }
-    public String    getMethod()           { return method; }
-    public String    getStatus()           { return status; }
-    public String    getAssignedProvider() { return assignedProvider; }
-    public int       getAttemptCount()     { return attemptCount; }
-    public Instant   getCreatedAt()        { return createdAt; }
-    public Instant   getUpdatedAt()        { return updatedAt; }
+    public UUID       getId()                    { return id; }
+    public BigDecimal getAmount()                { return amount; }
+    public String     getCurrency()              { return currency; }
+    public String     getMethod()                { return method; }
+    public String     getStatus()                { return status; }
+    public String     getAssignedProvider()      { return assignedProvider; }
+    public String     getProviderTransactionId() { return providerTransactionId; }
+    public int        getAttemptCount()          { return attemptCount; }
+    public Instant    getCreatedAt()             { return createdAt; }
+    public Instant    getUpdatedAt()             { return updatedAt; }
 
     // Setters needed by the adapter when updating mutable fields
-    public void setStatus(String status)                    { this.status = status; }
-    public void setAssignedProvider(String assignedProvider){ this.assignedProvider = assignedProvider; }
-    public void setAttemptCount(int attemptCount)           { this.attemptCount = attemptCount; }
-    public void setUpdatedAt(Instant updatedAt)             { this.updatedAt = updatedAt; }
+    public void setStatus(String status)                                   { this.status = status; }
+    public void setAssignedProvider(String assignedProvider)               { this.assignedProvider = assignedProvider; }
+    public void setProviderTransactionId(String providerTransactionId)     { this.providerTransactionId = providerTransactionId; }
+    public void setAttemptCount(int attemptCount)                          { this.attemptCount = attemptCount; }
+    public void setUpdatedAt(Instant updatedAt)                            { this.updatedAt = updatedAt; }
 }

@@ -12,7 +12,7 @@ import com.yuno.payment.domain.service.RoutingEngine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 
@@ -30,8 +30,11 @@ import java.util.Optional;
  *   8. Publish domain event for each transition
  *   9. Store idempotency result and return
  *
- * @Transactional wraps the entire flow in one DB transaction.
+ * Transaction ownership: each repository.save() call carries its own @Transactional
+ * on the adapter, so the DB connection is held only for the duration of the SQL
+ * statement — never across provider HTTP calls or retry backoff sleeps.
  */
+@Service
 public class CreatePaymentService implements CreatePaymentUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(CreatePaymentService.class);
@@ -55,7 +58,6 @@ public class CreatePaymentService implements CreatePaymentUseCase {
     }
 
     @Override
-    @Transactional
     public PaymentResult execute(CreatePaymentCommand command) {
 
         // ── 1. Idempotency check ──────────────────────────────────────────────
@@ -87,12 +89,16 @@ public class CreatePaymentService implements CreatePaymentUseCase {
         try {
             ExecutionResult result = executor.execute(payment, chain);
 
-            eventPublisher.publishEvent(payment.markSuccess(result.winningProviderId()));
+            eventPublisher.publishEvent(payment.markSuccess(result.winningProviderId(), result.providerTransactionId()));
             repository.save(payment);
 
         } catch (PaymentFailedException e) {
             eventPublisher.publishEvent(payment.markFailed());
             repository.save(payment);
+            // Cache the failure so a retry with the same key returns FAILED
+            // immediately instead of re-attempting the charge.
+            // Client must use a new Idempotency-Key to retry the payment.
+            idempotency.store(command.idempotencyKey(), toResult(payment));
             throw e;
         }
 
@@ -103,16 +109,6 @@ public class CreatePaymentService implements CreatePaymentUseCase {
     }
 
     private PaymentResult toResult(Payment payment) {
-        return new PaymentResult(
-                payment.getId().toString(),
-                payment.getStatus().name(),
-                payment.getMethod().name(),
-                payment.getAssignedProvider(),
-                payment.getAmount().amount(),
-                payment.getAmount().currency(),
-                payment.getAttemptCount(),
-                payment.getCreatedAt(),
-                payment.getUpdatedAt()
-        );
+        return PaymentResultMapper.toResult(payment);
     }
 }

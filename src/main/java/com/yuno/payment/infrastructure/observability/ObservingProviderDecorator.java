@@ -41,16 +41,21 @@ public class ObservingProviderDecorator implements PaymentProviderPort {
                 .lowCardinalityKeyValue("provider.id", delegate.providerId())
                 .lowCardinalityKeyValue("payment.method", payment.getMethod().name());
 
-        return observation.observe(() -> {
+        observation.start();
+        try (Observation.Scope ignored = observation.openScope()) {
             ProviderResult result = delegate.charge(payment);
 
-            // Record outcome as a tag so it's visible in Zipkin
+            // Set outcome tag and optional failure event before stopping the observation
             observation.lowCardinalityKeyValue("outcome", result.success() ? "success" : "failure");
             if (!result.success()) {
                 observation.event(Observation.Event.of("charge.failed", result.failureReason()));
             }
-
             return result;
-        });
+        } catch (Exception e) {
+            observation.error(e);
+            throw e;
+        } finally {
+            observation.stop();
+        }
     }
 }

@@ -11,6 +11,7 @@ public record PaymentHttpResponse(
         String status,
         String method,
         String assignedProvider,
+        String providerTransactionId,
         BigDecimal amount,
         String currency,
         int attemptCount,

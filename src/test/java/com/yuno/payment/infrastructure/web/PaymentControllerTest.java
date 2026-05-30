@@ -49,7 +49,7 @@ class PaymentControllerTest {
 
     private PaymentResult sampleResult(String paymentId, String status, String provider) {
         return new PaymentResult(
-                paymentId, status, "CARD", provider,
+                paymentId, status, "CARD", provider, "txn-" + paymentId,
                 new BigDecimal("100.00"), "USD", 1,
                 Instant.parse("2026-04-11T10:00:00Z"),
                 Instant.parse("2026-04-11T10:00:01Z")

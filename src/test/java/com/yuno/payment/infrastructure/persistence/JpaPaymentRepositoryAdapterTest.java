@@ -27,7 +27,12 @@ import static org.assertj.core.api.Assertions.*;
 @Testcontainers(disabledWithoutDocker = true)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JpaPaymentRepositoryAdapter.class, PaymentEntityMapper.class})
-@Sql("classpath:db/migration/V1__create_payments_table.sql")
+@Sql(scripts = {
+    "classpath:db/migration/V1__create_payments_table.sql",
+    "classpath:db/migration/V2__add_provider_transaction_id.sql",
+    "classpath:db/migration/V3__add_optimistic_locking_version.sql",
+    "classpath:db/migration/V4__create_payment_status_history.sql"
+})
 @DisplayName("JpaPaymentRepositoryAdapter")
 class JpaPaymentRepositoryAdapterTest {
 
@@ -66,7 +71,7 @@ class JpaPaymentRepositoryAdapterTest {
 
         payment.markProcessing();
         repository.save(payment);
-        payment.markSuccess("PROVIDER_A");
+        payment.markSuccess("PROVIDER_A", "txn-001");
         repository.save(payment);
 
         Payment found = repository.findById(payment.getId()).orElseThrow();

@@ -24,7 +24,7 @@ class InMemoryIdempotencyAdapterTest {
 
     private PaymentResult sampleResult(String paymentId) {
         return new PaymentResult(
-                paymentId, "SUCCESS", "CARD", "PROVIDER_A",
+                paymentId, "SUCCESS", "CARD", "PROVIDER_A", "txn-" + paymentId,
                 new BigDecimal("100.00"), "USD", 1,
                 Instant.now(), Instant.now()
         );
@@ -60,12 +60,12 @@ class InMemoryIdempotencyAdapterTest {
     }
 
     @Test
-    @DisplayName("overwriting the same key replaces the result")
-    void overwriteReplaces() {
+    @DisplayName("second store on same key is a no-op — first writer wins")
+    void secondStoreIsNoop() {
         IdempotencyKey key = new IdempotencyKey("key-overwrite");
-        adapter.store(key, sampleResult("pay-old"));
-        adapter.store(key, sampleResult("pay-new"));
+        adapter.store(key, sampleResult("pay-first"));
+        adapter.store(key, sampleResult("pay-second")); // must not overwrite
 
-        assertThat(adapter.find(key).get().paymentId()).isEqualTo("pay-new");
+        assertThat(adapter.find(key).get().paymentId()).isEqualTo("pay-first");
     }
 }

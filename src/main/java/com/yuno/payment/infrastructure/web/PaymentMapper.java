@@ -30,6 +30,7 @@ public class PaymentMapper {
                 result.status(),
                 result.method(),
                 result.assignedProvider(),
+                result.providerTransactionId(),
                 result.amount(),
                 result.currency(),
                 result.attemptCount(),
